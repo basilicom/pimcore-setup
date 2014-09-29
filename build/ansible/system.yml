@@ -1,0 +1,18 @@
+---
+- name: Install LAMP Stack with PHP 5.5 and MySQL
+  user: root
+  hosts: all
+  roles:
+    - upgrade
+    - common
+    - apache
+    - pagespeed
+    - mysql
+    - memcached
+    - beanstalkd
+    - mongodb
+    - php
+    - composer
+    - { role: php-pear, pear_channels: [pear.phing.info], pear_packages: [phing/phing, HTTP_Request2] }
+    - { role: vagrant, when: is_vagrant }
+

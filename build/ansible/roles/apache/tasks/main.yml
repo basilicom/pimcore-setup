@@ -1,0 +1,42 @@
+---
+- name: Install Apache
+  apt: name=apache2 state=present force=yes
+
+- name: Enable Apache2 rewrite module
+  shell: a2enmod rewrite
+  notify:
+    - restart apache2
+
+- name: Enable Apache2 unique_id module
+  shell: a2enmod unique_id
+  notify:
+    - restart apache2
+
+- name: Enable Apache2 expires module
+  shell: a2enmod expires
+  notify:
+    - restart apache2
+
+- name: Enable Apache2 headers module
+  shell: a2enmod headers
+  notify:
+    - restart apache2
+
+- name: Disable server signature
+  lineinfile: dest=/etc/apache2/conf-enabled/security.conf state=present regexp="^ServerSignature *" line="ServerSignature Off"
+  notify:
+    - restart apache2
+
+- name: Disable server tokens
+  lineinfile: dest=/etc/apache2/conf-enabled/security.conf state=present regexp="^ServerTokens *" line="ServerTokens Prod"
+  notify:
+    - restart apache2
+
+- name: Set a global ServerNameserver tokens
+  lineinfile: dest=/etc/apache2/apache2.conf state=present regexp="^ServerName *" line="ServerName webserver"
+  notify:
+    - restart apache2
+
+- name: Set max request workers to 20
+  lineinfile: dest=/etc/apache2/mods-available/mpm_prefork.conf state=present regexp="^[ \t]*MaxRequestWorkers[ \t]+" line="    MaxRequestWorkers 20"
+

@@ -1,0 +1,46 @@
+---
+- name: Set the hostname
+  hostname: name={{ server_hostname }}
+
+- name: Set IP in hosts file for hostname
+  lineinfile: dest=/etc/hosts state=present regexp="^{{ server_ip }} {{ server_hostname }}" line="{{ server_ip }} {{ server_hostname }}"
+
+- name: Configure system wide phing build properties
+  template: src=phing-build.properties.j2 dest=/etc/phing-build.properties
+
+- name: Fix ownership for system wide phing build properties
+  command: chown www-data:www-data /etc/phing-build.properties
+
+- name: Fix ownership for www directory
+  command: chown -R www-data:www-data /var/www
+
+- file: path=/var/www/.ssh owner=www-data group=www-data mode=0700 state=directory
+- file: path=/var/www/sites owner=www-data group=www-data mode=0775 state=directory
+
+- name: SSH Key-Pair for www-data
+  command: ssh-keygen -b 2048 -t rsa -f /var/www/.ssh/id_rsa -q -N "" creates=/var/www/.ssh/id_rsa
+  sudo_user: www-data
+  sudo: yes
+
+- name: Create authorized_keys file
+  template: src=authorized_keys.j2 dest=/var/www/.ssh/authorized_keys
+  sudo_user: www-data
+  sudo: yes
+
+- file: path=/var/www/.ssh/authorized_keys owner=www-data group=www-data mode=0600 state=file
+
+- name: Set a /bin/bash shell for www-data user
+  command: chsh --shell /bin/bash www-data
+
+- name: Create ssh config file
+  template: src=config.j2 dest=/var/www/.ssh/config
+  sudo_user: www-data
+  sudo: yes
+
+- name: Add www-data to sudoers [dev-mode!]
+  command: usermod -G sudo www-data
+
+- name: Passwordless sudo for www-data
+  template: src=sudoers_d-www-data.j2 dest=/etc/sudoers.d/10_www-data
+
+

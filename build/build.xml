@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="project" default="help" basedir="..">
+
+    <!-- Sets the DSTAMP, TSTAMP and TODAY properties -->
+    <tstamp/>
+
+	<property name="pimcore.downloadUrl" value="https://www.pimcore.org/download/pimcore-latest.zip" />
+
+    <property name="wwwuser" value="www-data" override="false" />
+    <property name="hoster" value="local" override="false" />
+    <property name="apache.sendfile" value="on" override="false" />
+    <property name="apache.enableSsl" value="false" override="false" />
+    <property name="apache.restart" value="false" override="false" />
+    <property name="server.hostname" value="webX" override="false" />
+
+
+    <property name="build.mode.interactive" value="true" />
+
+    <property name="cmd.sudo" value="sudo" />
+
+    <!-- Load the sample default configuration -->
+    <property file="build/build.properties" override="true" />
+
+    <!-- Load the system wide configuration (on top of these defaults), if exists -->
+    <property file="/etc/phing-build.properties" override="true" />
+
+	<!-- ========== INITIAL TARGETS ========== -->
+
+    <target name="help">
+        <echo msg="HELP" />
+    </target>
+
+
+	<target name="setup" depends="" description="permissions, configs, dbstart, ...">
+
+        <echo msg="==========================================================" />
+        <echo msg="PHING PROJECT SETUP - installing on: ${hoster} " />
+        <echo msg="----------------------------------------------------------" />
+
+        <phingcall target="dbcreate"/>
+        <phingcall target="pimcoremerge"/>
+        <phingcall target="pimcoreinstall"/>
+        <phingcall target="configcreate"/>
+        <phingcall target="apacheconfig"/>
+        <phingcall target="installcron"/>
+    </target>
+
+    <!-- ========== EXTRA/SUPPORT TARGETS ========== -->
+
+    <target name="dbcreate">
+        <echo msg="Creating Database / Access - [dbcreate]" />
+        <pdosqlexec
+                url="${db.driver}:host=${db.host}"
+                userid="${db.root.user}"
+                password="${db.root.password}"
+                onerror="continue">
+            <transaction>
+                CREATE DATABASE ${db.name} default charset utf8;
+                GRANT ALL PRIVILEGES ON ${db.name}.* TO '${db.user}'@'%' IDENTIFIED BY '${db.password}';
+                GRANT ALL PRIVILEGES ON ${db.name}.* TO '${db.user}'@'localhost' IDENTIFIED BY '${db.password}';
+                GRANT ALL PRIVILEGES ON ${db.name}.* TO '${db.user}'@'127.0.0.1' IDENTIFIED BY '${db.password}';
+                USE ${db.name};
+            </transaction>
+            <!-- <transaction src="build/db/init.sql"/> -->
+            <formatter type="plain" usefile="false"/>
+        </pdosqlexec>
+        <!-- now test -->
+        <pdosqlexec
+                url="${db.driver}:host=${db.host};dbname=${db.name}"
+                userid="${db.user}"
+                password="${db.password}"
+                onerror="abort">
+            <transaction>
+                SELECT 'SUCCESS' AS test_message;
+            </transaction>
+            <formatter type="plain" usefile="false"/>
+        </pdosqlexec>
+    </target>
+
+    <target name="pimcoremerge">
+        <echo msg="Download and unpack pimcore distribution - [pimcoremerge]" />
+
+        <available file="htdocs/pimcore" type="dir" property="checkismerged"/>
+        <if>
+            <not><equals arg1="${checkismerged}" arg2="true"/></not>
+            <then>
+                <if>
+                    <available file="var/build/pimcore-distribution.zip" type="file" property="checkusedsetup"/>
+                    <then>
+                        <echo msg="Existing 'var/build/pimcore-distribution.zip' found - using it." />
+                    </then>
+                    <else>
+                        <httpget url="${pimcore.downloadUrl}" dir="var/build" filename="pimcore-distribution.zip"/>
+                    </else>
+                </if>
+
+                <delete dir="var/build/pimcore-distribution" includeemptydirs="true" quiet="true" failonerror="false" />
+                <mkdir dir="var/build/pimcore-distribution" />
+
+                <unzip file="var/build/pimcore-distribution.zip" todir="var/build/pimcore-distribution" />
+
+                <exec
+                    command="rsync -a --ignore-existing var/build/pimcore-distribution/ htdocs/ "
+                    dir="."
+                    checkreturn="true"
+                    logoutput="true"
+                    />
+
+                <delete dir="var/build/pimcore-distribution" includeemptydirs="true" quiet="true" failonerror="false" />
+            </then>
+            <else>
+                <echo msg="Pimcore source already installed - Skipping download/merge process." />
+            </else>
+        </if>
+    </target>
+
+    <target name="pimcoreinstall" depends="" >
+        <echo msg="Installing Pimcore - [pimcoreinstall]" />
+        <available file="htdocs/website/var/config/system.xml" type="file" property="checkusedsetup"/>
+        <if>
+            <not><equals arg1="${checkusedsetup}" arg2="true"/></not>
+            <then>
+                <exec
+                    command="sudo -u ${wwwuser} /usr/bin/php build/bin/pimcore_install.php '${db.host}' '${db.name}' '${db.user}' '${db.password}'"
+                    dir="."
+                    checkreturn="true"
+                    logoutput="true"
+                    />
+            </then>
+            <else>
+                <echo msg="Pimcore already installed - Skipping install script." />
+            </else>
+        </if>
+    </target>
+
+    <target name="configcreate">
+        <echo msg="Creating set of configs in var/build - [configcreate]" />
+        <copy todir="var/build" overwrite="false">
+            <fileset dir="build/samples/etc">
+                <include name="*.php" />
+                <include name="*.properties" />
+                <include name="*.ini" />
+                <include name="*.xml" />
+                <include name="*.cfg" />
+                <include name="*.conf" />
+            </fileset>
+            <filterchain>
+                <replacetokens begintoken="@@" endtoken="@@">
+                    <token key="PROJECT_KEY" value="${project.key}" />
+                    <token key="PROJECT_BASEDIR" value="${project.basedir}" />
+                    <token key="HTTPD_HOST" value="${httpd.host}" />
+                    <token key="DB_HOST" value="${db.host}" />
+                    <token key="DB_USER" value="${db.user}" />
+                    <token key="DB_PASSWORD" value="${db.password}" />
+                    <token key="DB_NAME" value="${db.name}" />
+                    <token key="APACHE_SENDFILE" value="${apache.sendfile}" />
+                </replacetokens>
+            </filterchain>
+        </copy>
+
+        <!-- copy pimcore cache config -->
+
+        <copy file="var/build/cache.xml" tofile="htdocs/website/var/config/cache.xml" overwrite="false"/>
+        <chmod file="htdocs/website/var/config/cache.xml" mode="0666" verbose="false"/>
+
+    </target>
+
+    <target name="apacheconfig">
+        <echo msg="Configure Apache - [apacheconfig]" />
+
+        <exec
+            command="test -f /etc/apache2/sites-available/${project.key}.conf ||
+                ${cmd.sudo} cp var/build/vhost.conf /etc/apache2/sites-available/${project.key}.conf &amp;&amp;
+                ${cmd.sudo} a2ensite ${project.key}"
+            dir="."
+            logoutput="true"
+            checkreturn="true"
+            />
+
+        <if>
+            <equals arg1="${apache.enableSsl}" arg2="true"/>
+            <then>
+                <exec
+                    command="test -f /etc/apache2/sites-available/${project.key}-ssl.conf ||
+                        ${cmd.sudo} cp var/build/vhost-ssl.conf /etc/apache2/sites-available/${project.key}-ssl.conf &amp;&amp;
+                        ${cmd.sudo} a2ensite ${project.key}-ssl"
+                    dir="."
+                    logoutput="true"
+                    checkreturn="true"
+                    />
+            </then>
+        </if>
+
+        <phingcall target="apacherestart"/>
+    </target>
+
+    <target name="apachepurge">
+        <exec
+                command="test -f /etc/apache2/sites-available/${project.key}.conf &amp;&amp;
+                ${cmd.sudo} a2dissite ${project.key} &amp;&amp;
+                ${cmd.sudo} rm /etc/apache2/sites-available/${project.key}.conf"
+                dir="."
+                logoutput="true"
+                checkreturn="false"
+                />
+        <if>
+            <equals arg1="${apache.enableSsl}" arg2="true"/>
+            <then>
+                <exec
+                    command="test -f /etc/apache2/sites-available/${project.key}-ssl.conf &amp;&amp;
+                        ${cmd.sudo} a2dissite ${project.key}-ssl &amp;&amp;
+                        ${cmd.sudo} rm /etc/apache2/sites-available/${project.key}-ssl.conf"
+                    dir="."
+                    logoutput="true"
+                    checkreturn="false"
+                    />
+            </then>
+        </if>
+        <phingcall target="apacherestart"/>
+    </target>
+
+    <target name="installcron">
+        <echo msg="Installing pimcore maintenance cron job - [installcron]" />
+        <exec
+                command="{ sudo -u ${wwwuser} crontab -l |sed -r 's@^.*${project.basedir}/htdocs/pimcore/cli/maintenance.php.*$@@' ; echo '*/5 * * * * /usr/bin/php ${project.basedir}/htdocs/pimcore/cli/maintenance.php 2>&amp;1 >>${project.basedir}/var/log/cron-maintenance.log'; } | sudo -u ${wwwuser} crontab"
+                dir="."
+                checkreturn="true"
+                logoutput="true"
+                />
+    </target>
+
+    <target name="removecron">
+        <echo msg="removing pimcore maintenance cron job - [removecron]" />
+        <exec
+                command="{ sudo -u ${wwwuser} crontab -l |sed -r 's@^.*${project.basedir}/htdocs/pimcore/cli/maintenance.php.*$@@' ; } | sudo -u ${wwwuser} crontab"
+                dir="."
+                checkreturn="true"
+                logoutput="true"
+                />
+    </target>
+
+    <!-- ========== EXTRA/SUPPORT TARGETS ========== -->
+
+    <target name="permissions" description="Sets file- and directory permissions">
+        <chmod file="var/build" mode="0777" verbose="true" />
+        <chmod file="var/tmp" mode="0777" verbose="true" />
+
+        <chmod mode="0777" verbose="true" failonerror="true">
+            <fileset dir="htdocs/website/var">
+                <include name="*"/>
+                <include name="**" />
+                <exclude name="**/.dummy"/>
+                <exclude name="**/.keep"/>
+            </fileset>
+        </chmod>
+    </target>
+
+    <target name="dbdrop">
+        <echo msg="Drop database [dbdrop]" />
+        <pdosqlexec
+                url="${db.driver}:host=${db.host}"
+                userid="${db.root.user}"
+                password="${db.root.password}"
+                onerror="abort">
+            <transaction>
+                DROP DATABASE IF EXISTS ${db.name};
+            </transaction>
+            <formatter type="plain" usefile="false"/>
+        </pdosqlexec>
+    </target>
+
+	<target name="dbdump">
+		<echo msg="Dump database (to var/tmp/)- [dbdump]" />
+		<exec
+			command="mysqldump --add-drop-table -h ${db.host} -u ${db.user} --password=${db.password} ${db.name} | gzip > var/tmp/${db.name}-${DSTAMP}${TSTAMP}.sql.gz"
+			dir="."
+			checkreturn="true"
+			logoutput="false"
+		/>
+		<echo msg="New SQL dump created: var/tmp/${db.name}-${DSTAMP}${TSTAMP}.sql.gz" />
+	</target>	
+
+	<target name="dbrestore">
+		<echo msg="Restore database from dump - [dbrestore]" />
+		<input propertyName="dbrestore.file" promptChar="?" message="SQL-Dump filename (e.g.: var/tmp/project.sql.gz)"></input>
+		<exec
+			command="gunzip -c ${dbrestore.file} | mysql -h ${db.host} -u ${db.user} --password=${db.password} ${db.name}"
+			dir="."
+			checkreturn="true"
+			logoutput="false"
+		/>
+	</target>
+
+    <target name="backup">
+        <exec
+                command="mysqldump --add-drop-table -h ${db.host} -u ${db.user} --password=${db.password} ${db.name} | gzip > var/tmp/current.sql.gz"
+                dir="."
+                checkreturn="true"
+                logoutput="false"
+                />
+        <tar destfile="var/tmp/backup.tar.gz" compression="gzip">
+            <fileset dir=".">
+                <include name="htdocs/website/var/cache/**/**" />
+                <include name="htdocs/website/var/config/**/**" />
+                <include name="htdocs/website/var/config/imagepipelines/**/**" />
+                <include name="htdocs/website/var/versions/asset//**/**" />
+                <include name="htdocs/website/var/versions/document/**/**" />
+                <include name="htdocs/website/var/versions/object/**/**" />
+                <include name="htdocs/website/var/assets/**/**" />
+                <include name="htdocs/website/var/classes/**/**" />
+                <include name="var/tmp/current.sql.gz" />
+            </fileset>
+        </tar>
+    </target>
+
+    <target name="restore">
+        <input propertyName="backup.file" promptChar="?">Backup filename (e.g.: var/tmp/backup.tar.gz)</input>
+        <untar file="${backup.file}" todir="." />
+        <!-- change db credentials in config
+         -->
+        <exec
+                command="gunzip -c var/tmp/current.sql | mysql -h ${db.host} -u ${db.user} --password=${db.password} ${db.name}"
+                dir="."
+                checkreturn="true"
+                logoutput="true"
+                />
+    </target>
+
+    <target name="checkpreviousinstallation">
+
+        <available file="htdocs/website/var/config/system.xml" type="file" property="checkusedsetup"/>
+        <fail message="Existing pimcore installation found. To install again run 'phing purge'" if="checkusedsetup"/>
+    </target>
+
+    <target name="apacherestart">
+        <if>
+            <equals arg1="${apache.restart}" arg2="true"/>
+            <then>
+                <exec
+                    command="sudo service apache2 restart"
+                    dir="."
+                    logoutput="true"
+                    checkreturn="true"
+                    />
+            </then>
+            <else>
+                <echo msg="Manual Apache restart needed - check config &amp; activate by: service apache2 restart" />
+            </else>
+        </if>
+    </target>
+
+    <target name="purge" depends="purgeconfirm">
+
+        <if>
+            <equals arg1="${action.purge}" arg2="1"/>
+            <then>
+                <echo msg="Remove all traces of the app / build processes - [purge]" />
+                <phingcall target="removecron" />
+                <phingcall target="apachepurge" />
+                <phingcall target="dbdrop" />
+                <phingcall target="purgefiles" />
+            </then>
+            <else>
+                <echo message="purge canceled."/>
+            </else>
+        </if>
+    </target>
+
+    <target name="purgeconfirm">
+        <if>
+            <equals arg1="${build.mode.interactive}" arg2="1" />
+            <then>
+                <echo message="W-A-R-N-I-N-G! Project files and database will be deleted!" />
+                <echo message="Cronjob and Apache sites will be be removed, too." />
+                <echo message="Make sure all changed/new files in htdocs are added/committed!" />
+                <input propertyName="purge.action.confirmed" promptChar="?" validArgs="Y,N" defaultValue="N" message="Are you sure you want to purge files and drop the database"></input>
+                <if>
+                    <equals arg1="${purge.action.confirmed}" arg2="Y"/>
+                    <then>
+                        <property name="action.purge" value="true" />
+                    </then>
+                    <else>
+                        <echo message="Purge ABORTED." />
+                    </else>
+                </if>
+            </then>
+            <else>
+                <echo message="Disabled interactive mode"/>
+                <property name="action.purge" value="true"/>
+            </else>
+        </if>
+    </target>
+
+    <target name="purgefiles" >
+        <delete>
+            <fileset dir="var/build">
+                <exclude name=".keep" />
+                <exclude name=".dummy" />
+            </fileset>
+            <fileset dir="var/tmp">
+                <exclude name=".keep" />
+                <exclude name=".dummy" />
+            </fileset>
+            <fileset dir="var/log">
+                <exclude name=".keep" />
+                <exclude name=".dummy" />
+            </fileset>
+        </delete>
+        <exec
+            command="git clean -d -f -x htdocs"
+            dir="."
+            logoutput="true"
+            checkreturn="true"
+            />
+        <exec
+            command="git clean -d -f -x htdocs"
+            dir="."
+            logoutput="true"
+            checkreturn="true"
+            />
+    </target>
+
+</project>

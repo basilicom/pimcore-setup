@@ -1,0 +1,8 @@
+[vagrant]
+192.168.50.10
+
+[vagrant:vars]
+ansible_connection=local
+is_vagrant=true
+is_production=false
+project_path=/var/www/sites/project

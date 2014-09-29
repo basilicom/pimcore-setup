@@ -1,0 +1,37 @@
+# ignore phpstorm ide files
+.idea
+
+# vagrant status
+.vagrant
+
+# ignore vim files, vim backups, other backups:
+*.swp
+*~
+*.bak
+.~lock.*
+
+# log files
+*.log
+
+# pimcore system
+/htdocs/pimcore
+
+# pimcore var
+/htdocs/website/var
+
+# pimcore plugins
+/htdocs/plugins/*
+
+# temp files
+/var/tmp/*
+
+# build files
+/var/build/*
+
+# composer
+/vendor/*
+
+# keep these two at the end of this file!
+!.keep
+!.dummy
+

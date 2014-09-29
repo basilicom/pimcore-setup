@@ -1,0 +1,5 @@
+---
+- name: Install OS + Project
+  hosts: all
+- include: system.yml
+- include: project.yml

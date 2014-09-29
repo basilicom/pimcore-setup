@@ -1,0 +1,13 @@
+---
+- name: Set apache run user to vagrant in /etc/apache2/envvars
+  lineinfile: dest=/etc/apache2/envvars state=present regexp="^export APACHE_RUN_USER=" line="export APACHE_RUN_USER=vagrant"
+  notify:
+    - restart apache2
+
+- name: Configure system wide phing build properties
+  template: src=phing-build.properties.j2 dest=/etc/phing-build.properties
+
+- name: Disable apache default site
+  file: path=/etc/apache2/sites-enabled/000-default.conf state=absent
+  notify:
+    - restart apache2

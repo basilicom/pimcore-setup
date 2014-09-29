@@ -1,0 +1,18 @@
+---
+- name: Common software
+  apt: name={{ item }} state=present
+  with_items:
+  - python-software-properties
+  - build-essential
+  - curl
+  - screen
+  - vim
+  - ntp
+  - jpegoptim
+  - pngcrush
+  - git-core
+  - ufw
+
+- name: Set default locale
+  lineinfile: dest=/etc/environment state=present regexp="^LC_ALL=" line="LC_ALL=en_US.utf8"
+

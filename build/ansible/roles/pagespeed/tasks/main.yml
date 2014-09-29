@@ -1,0 +1,8 @@
+---
+- name: Download mod_pagespeed
+  get_url: url=https://dl-ssl.google.com/dl/linux/direct/mod-pagespeed-stable_current_amd64.deb dest=/tmp/mod-pagespeed-stable_current_amd64.deb mode=0440
+
+- name: Install mod_pagespeed
+  shell: dpkg -i /tmp/mod-pagespeed-stable_current_amd64.deb && apt-get -f install && a2enmod pagespeed
+  notify:
+    - restart apache2

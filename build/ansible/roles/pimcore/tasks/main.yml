@@ -1,0 +1,11 @@
+---
+- name: Pimcore setup
+  shell: cd {{ project_path }}/build && phing -logger phing.listener.DefaultLogger -Dbuild.mode.interactive=false setup
+  register: pimcoresetup
+  sudo_user: vagrant
+  sudo: yes
+  when: is_vagrant
+- debug: var=pimcoresetup.stdout_lines
+
+- name: Disable Apache default site
+  file: name=/etc/apache2/sites-enabled/000-default.conf state=absent

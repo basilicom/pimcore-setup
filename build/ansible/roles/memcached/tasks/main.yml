@@ -1,0 +1,5 @@
+---
+- name: Memcached
+  apt: name={{ item }} state=present
+  with_items:
+  - memcached

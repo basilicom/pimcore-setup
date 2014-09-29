@@ -1,0 +1,75 @@
+---
+- name: Install PHP5
+  apt: name={{ item }} state=present force=yes
+  with_items:
+  - php5-common
+  - php5-mysqlnd
+  - php5-xmlrpc
+  - php5-mcrypt
+  - php5-curl
+  - php5-gd
+  - php5-cli
+  - php-pear
+  - php5-dev
+  - php5-imap
+  - php5-imagick
+  - php5-memcache
+  - php5-mongo
+  - libapache2-mod-php5
+  notify:
+    - restart apache2
+
+- name: Enable PHP5 opcode cache
+  command: php5enmod opcache
+  notify:
+    - restart apache2
+
+- name: Enable PHP5 mcrypt
+  command: php5enmod mcrypt
+  notify:
+    - restart apache2
+
+- name: Raise PHP memory Limit for Apache
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^memory_limit *=" line="memory_limit = 512M"
+  notify:
+    - restart apache2
+
+- name: Allow short open tags for Apache PHP
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^short_open_tag *=" line="short_open_tag = on"
+  notify:
+    - restart apache2
+
+- name: Allow short open tags for CLI PHP
+  lineinfile: dest=/etc/php5/cli/php.ini state=present regexp="^short_open_tag *=" line="short_open_tag = on"
+  notify:
+    - restart apache2
+
+- name: Allow PCNTL for Apache PHP
+  lineinfile: dest=/etc/php5/cli/php.ini state=present regexp="^disable_functions *=" line="disable_functions ="
+  notify:
+    - restart apache2
+
+- name: Allow PCNTL for CLI PHP
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^disable_functions *=" line="disable_functions ="
+
+- name: Allow writeable PHAR archives
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^phar.readonly *=" line="phar.readonly = Off"
+  notify:
+    - restart apache2
+
+- name: Do not expose Apache PHP
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^expose_php *=" line="expose_php = Off"
+  notify:
+    - restart apache2
+
+- name: 8MB max upload size
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^upload_max_filesize *=" line="upload_max_filesize = 8M"
+  notify:
+    - restart apache2
+
+- name: 12MB max POST size
+  lineinfile: dest=/etc/php5/apache2/php.ini state=present regexp="^post_max_size *=" line="post_max_size = 12M"
+  notify:
+    - restart apache2
+
+# @todo: xdebug?

@@ -1,0 +1,21 @@
+---
+- name: Install beanstalkd
+  apt: name={{ item }} state=present
+  with_items:
+    - beanstalkd
+
+- name: beanstalk - listen only on localhost interface
+  lineinfile: dest=/etc/default/beanstalkd state=present regexp="^BEANSTALKD_LISTEN_ADDR=.*" line="BEANSTALKD_LISTEN_ADDR=127.0.0.1"
+  notify:
+    - restart beanstalkd
+
+- name: Enable beanstalkd
+  lineinfile: dest=/etc/default/beanstalkd state=present regexp="^START=.*" line="START=yes"
+  notify:
+    - restart beanstalkd
+
+#- name: Persistent job storage for beanstalkd
+#  lineinfile: dest=/etc/default/beanstalkd state=present regexp="^BEANSTALKD_EXTRA=.*" line="BEANSTALKD_EXTRA="-b /var/lib/beanstalkd"
+#  notify:
+#    - restart beanstalkd
+

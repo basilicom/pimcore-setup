@@ -1,0 +1,11 @@
+{
+    "name":"basilicom/pimcore-setup",
+    "description":"Automated pimcore setup using vagrant, ansible and phing",
+    "license": "proprietary",
+    "config": {
+        "document-root-path": "./htdocs"
+    },
+    "require": {
+        "pimcore/example-plugin":  "dev-master"
+    }
+}
