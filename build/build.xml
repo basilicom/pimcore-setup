@@ -90,7 +90,7 @@
                         <echo msg="Existing 'var/build/pimcore-distribution.zip' found - using it." />
                     </then>
                     <else>
-                        <httpget url="${pimcore.downloadUrl}" dir="var/build" filename="pimcore-distribution.zip"/>
+			<httpget url="${pimcore.downloadUrl}" dir="var/build" filename="pimcore-distribution.zip" sslVerifyPeer="false"/>
                     </else>
                 </if>
 
