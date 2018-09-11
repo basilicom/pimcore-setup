@@ -1,3 +1,6 @@
+*THIS OLD AND OUTDATED! DO NOT USE! KEPT HERE FOR REFERENCE ONLY!*
+
+
 pimcore-setup
 ==========================
 
